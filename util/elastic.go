@@ -17,6 +17,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -43,6 +44,23 @@ func WaitForAvailible(url string, maxTimeout *time.Duration) error {
 		if err == nil && resp.StatusCode == 200 {
 			break
 		}
+
+		if logger.Level == logrus.DebugLevel {
+			if err != nil {
+				log.Debugf("elastic unavailible %v", err)
+			}
+
+			if resp != nil {
+				data, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					log.Debugf("elastic error [%d] - %s", resp.StatusCode, string(data))
+				} else {
+					log.Debugf("elastic error [%d]", resp.StatusCode)
+				}
+
+			}
+		}
+
 		log.Info("ElasticSearch not availible - wating")
 
 		if maxTimeout != nil && time.Now().Sub(start) > *maxTimeout {
