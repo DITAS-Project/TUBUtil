@@ -21,8 +21,19 @@ import (
 	"time"
 
 	"github.com/olivere/elastic"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
+
+var logger = logrus.New()
+var log = logrus.NewEntry(logger)
+
+func SetLogger(nLogger *logrus.Logger) {
+	logger = nLogger
+}
+
+func SetLog(entty *logrus.Entry) {
+	log = entty
+}
 
 func WaitForAvailible(url string, maxTimeout *time.Duration) error {
 	start := time.Now()
