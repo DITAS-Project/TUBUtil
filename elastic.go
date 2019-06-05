@@ -32,18 +32,37 @@ import (
 var logger = logrus.New()
 var log = logrus.NewEntry(logger)
 
+//SetLogger can be used to use a custom logrus for this package
 func SetLogger(nLogger *logrus.Logger) {
 	logger = nLogger
 }
 
+//SetLog can be used to use a custom logrus for this package
 func SetLog(entty *logrus.Entry) {
 	log = entty
 }
 
+//WaitForAvailible utility function that tries to connect to the given url for a given time. Using HTTP Head. Fails for all but 200 responses.
 func WaitForAvailible(url string, maxTimeout *time.Duration) error {
+	return WaitForAvailibleWithAuth(url, nil, maxTimeout)
+}
+
+//WaitForAvailibleWithAuth utility function that tries to connect to the given url for a given time. Using HTTP Head. Fails for all but 200 responses.
+func WaitForAvailibleWithAuth(url string, auth []string, maxTimeout *time.Duration) error {
 	start := time.Now()
 	for {
-		resp, err := http.Head(url)
+
+		req, err := http.NewRequest("HEAD", url, nil)
+
+		if err != nil {
+			continue
+		}
+
+		if auth != nil && len(auth) == 2 {
+			req.SetBasicAuth(auth[0], auth[1])
+		}
+
+		resp, err := http.DefaultClient.Do(req)
 
 		if err == nil && resp.StatusCode == 200 {
 			break
@@ -51,24 +70,24 @@ func WaitForAvailible(url string, maxTimeout *time.Duration) error {
 
 		if logger.Level == logrus.DebugLevel {
 			if err != nil {
-				log.Debugf("elastic unavailible %v", err)
+				log.Debugf("%s unavailible %v", url, err)
 			}
 
 			if resp != nil {
 				data, err := ioutil.ReadAll(resp.Body)
 				if err != nil {
-					log.Debugf("elastic error [%d] - %s", resp.StatusCode, string(data))
+					log.Debugf("error [%d] - %s", resp.StatusCode, string(data))
 				} else {
-					log.Debugf("elastic error [%d]", resp.StatusCode)
+					log.Debugf("error [%d]", resp.StatusCode)
 				}
 
 			}
 		}
 
-		log.Info("ElasticSearch not availible - wating")
+		log.Info("not availible - wating")
 
 		if maxTimeout != nil && time.Now().Sub(start) > *maxTimeout {
-			return errors.New("could not connect toElasticSearch in time")
+			return fmt.Errorf("could not connect to %s in time", url)
 		}
 
 		time.Sleep(time.Duration(1e+10)) //10 seconds
@@ -77,6 +96,7 @@ func WaitForAvailible(url string, maxTimeout *time.Duration) error {
 	return nil
 }
 
+//WaitForGreen blocks until an elasticserach instance reaches the green status.
 func WaitForGreen(es *elastic.Client, maxTimeout *time.Duration) error {
 	start := time.Now()
 	for {
@@ -94,7 +114,13 @@ func WaitForGreen(es *elastic.Client, maxTimeout *time.Duration) error {
 	return nil
 }
 
+//GetElasticIndex calculates the current VDC-Index-Name
 func GetElasticIndex(vdcName string) string {
 	t := time.Now()
 	return fmt.Sprintf("%s-%d-%02d-%02d", vdcName, t.Year(), t.Month(), t.Day())
+}
+
+//GetElasticIndexByIDs retuns the current VDC-Index-Name using Id's
+func GetElasticIndexByIDs(vdcID, blueprintID string) string {
+	return GetElasticIndex(fmt.Sprintf("%s-%s", blueprintID, vdcID))
 }
